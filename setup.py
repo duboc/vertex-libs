@@ -23,7 +23,8 @@ setup(
     install_requires=[
         "google-cloud-aiplatform",
         "google-generativeai",
-        "tenacity"
+        "tenacity",
+        "tiktoken"
     ],
     extras_require={
         "dev": [

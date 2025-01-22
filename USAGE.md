@@ -23,6 +23,7 @@ The package will automatically install the following dependencies:
 - `google-cloud-aiplatform`: For Vertex AI integration
 - `google-generativeai`: For Gemini API
 - `tenacity`: For retry logic
+- `tiktoken`: For token counting
 
 ## Prerequisites
 
@@ -98,6 +99,96 @@ response = client.generate_content(
     generation_config=config
 )
 ```
+
+### 3. Token Counting and Usage Tracking
+
+The client provides token counting capabilities using OpenAI's `tiktoken` library, which provides a good approximation for Gemini's token usage. This can be used independently or combined with content generation.
+
+#### Independent Token Counting
+```python
+from vertex_libs import GeminiClient
+from google.genai import types
+
+client = GeminiClient()
+
+contents = [
+    types.Content(
+        role="user",
+        parts=[types.Part.from_text("What is quantum computing?")]
+    )
+]
+
+# Count tokens before generation
+token_count = client.count_tokens(contents)
+print(f"Prompt tokens: {token_count.prompt_tokens}")
+print(f"Total tokens: {token_count.total_tokens}")
+```
+
+Note: Token counting is an approximation using the GPT-4 tokenizer, which is similar to Gemini's tokenization. The actual token count may vary slightly.
+
+#### Token Usage with Generation
+```python
+# Generate with token counting
+response, usage = client.generate_content(contents, count_tokens=True)
+print(f"Response: {response}")
+print(f"Token Usage:")
+print(f"- Total tokens: {usage.total_tokens}")
+print(f"- Prompt tokens: {usage.prompt_tokens}")
+print(f"- Completion tokens: {usage.completion_tokens}")
+```
+
+The `TokenCount` object provides:
+- `prompt_tokens`: Number of tokens in the input prompt
+- `completion_tokens`: Number of tokens in the generated response
+- `total_tokens`: Total tokens used (prompt + completion)
+
+### 4. Dynamic Response Formats
+
+The client can return either text or JSON responses based on your needs:
+
+#### Text Response
+```python
+# Get plain text response
+contents = [
+    types.Content(
+        role="user",
+        parts=[types.Part.from_text("What is quantum computing?")]
+    )
+]
+
+response = client.generate_content(contents)
+print(f"Text response: {response}")
+```
+
+#### JSON Response
+```python
+# Define schema for structured response
+json_schema = {
+    "type": "OBJECT",
+    "properties": {
+        "definition": {"type": "STRING"},
+        "advantages": {"type": "ARRAY", "items": {"type": "STRING"}}
+    }
+}
+
+# Get JSON response
+response = client.generate_content(
+    contents,
+    return_json=True,
+    json_schema=json_schema
+)
+
+# Parse and use the response
+data = json.loads(response)
+print(f"Definition: {data['definition']}")
+for advantage in data['advantages']:
+    print(f"- {advantage}")
+```
+
+You can use the same client instance to switch between formats based on your needs. The response format is determined by:
+- `return_json=False` (default): Returns plain text
+- `return_json=True`: Returns JSON formatted according to schema
+- `json_schema`: Optional schema to structure JSON responses
 
 ## Error Handling
 

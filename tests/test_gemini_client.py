@@ -19,6 +19,7 @@ import os
 from unittest.mock import Mock, patch
 from google.genai import types
 from vertex_libs import GeminiClient
+from vertex_libs.gemini_client import TokenCount
 from tenacity import RetryError
 
 @pytest.fixture
@@ -166,4 +167,129 @@ def test_custom_logger(caplog):
             client.generate_content(contents)
     
     # Verify warning was logged
-    assert any("Test error" in record.message for record in caplog.records) 
+    assert any("Test error" in record.message for record in caplog.records)
+
+def test_count_tokens(mock_genai, client):
+    # Mock token counting response
+    mock_count = Mock()
+    mock_count.total_tokens = 10
+    mock_genai.Client().count_tokens.return_value = mock_count
+
+    contents = [
+        types.Content(
+            role="user",
+            parts=[types.Part.from_text("Test prompt")]
+        )
+    ]
+
+    token_count = client.count_tokens(contents)
+    assert isinstance(token_count, TokenCount)
+    assert token_count.prompt_tokens == 10
+    assert token_count.completion_tokens == 0
+    assert token_count.total_tokens == 10
+
+def test_generate_content_with_token_count(mock_genai, client):
+    # Mock response
+    mock_response = Mock()
+    mock_response.text = "Test response with five tokens"
+    mock_genai.Client().models.generate_content.return_value = mock_response
+
+    # Mock token count
+    mock_count = Mock()
+    mock_count.total_tokens = 10
+    mock_genai.Client().count_tokens.return_value = mock_count
+
+    contents = [
+        types.Content(
+            role="user",
+            parts=[types.Part.from_text("Test prompt")]
+        )
+    ]
+
+    response, token_count = client.generate_content(contents, count_tokens=True)
+    assert response == "Test response with five tokens"
+    assert isinstance(token_count, TokenCount)
+    assert token_count.prompt_tokens == 10
+    assert token_count.completion_tokens == 5
+    assert token_count.total_tokens == 15
+
+def test_generate_content_json_response(mock_genai, client):
+    # Mock JSON response
+    mock_response = Mock()
+    mock_response.text = '{"key": "value", "number": 42}'
+    mock_genai.Client().models.generate_content.return_value = mock_response
+
+    contents = [
+        types.Content(
+            role="user",
+            parts=[types.Part.from_text("Return JSON")]
+        )
+    ]
+
+    response = client.generate_content(contents, return_json=True)
+    assert isinstance(response, dict)
+    assert response["key"] == "value"
+    assert response["number"] == 42
+
+def test_generate_content_non_json_response(mock_genai, client):
+    # Mock non-JSON response
+    mock_response = Mock()
+    mock_response.text = "Plain text response"
+    mock_genai.Client().models.generate_content.return_value = mock_response
+
+    contents = [
+        types.Content(
+            role="user",
+            parts=[types.Part.from_text("Return text")]
+        )
+    ]
+
+    response = client.generate_content(contents, return_json=True)
+    assert isinstance(response, dict)
+    assert response["text"] == "Plain text response"
+
+def test_generate_content_json_with_token_count(mock_genai, client):
+    # Mock JSON response
+    mock_response = Mock()
+    mock_response.text = '{"result": "success"}'
+    mock_genai.Client().models.generate_content.return_value = mock_response
+
+    # Mock token count
+    mock_count = Mock()
+    mock_count.total_tokens = 5
+    mock_genai.Client().count_tokens.return_value = mock_count
+
+    contents = [
+        types.Content(
+            role="user",
+            parts=[types.Part.from_text("Return JSON")]
+        )
+    ]
+
+    response, token_count = client.generate_content(
+        contents,
+        return_json=True,
+        count_tokens=True
+    )
+    
+    assert isinstance(response, dict)
+    assert response["result"] == "success"
+    assert isinstance(token_count, TokenCount)
+    assert token_count.prompt_tokens == 5
+    assert token_count.completion_tokens == 1  # One JSON object
+    assert token_count.total_tokens == 6
+
+def test_count_tokens_error(mock_genai, client):
+    # Mock token counting error
+    mock_genai.Client().count_tokens.side_effect = Exception("Token counting failed")
+
+    contents = [
+        types.Content(
+            role="user",
+            parts=[types.Part.from_text("Test prompt")]
+        )
+    ]
+
+    with pytest.raises(Exception) as exc_info:
+        client.count_tokens(contents)
+    assert "Token counting failed" in str(exc_info.value) 

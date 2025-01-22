@@ -15,11 +15,22 @@
 """
 
 import os
+import json
 import logging
-from typing import Optional, List
+from typing import Optional, List, Union, Dict, Tuple
+from dataclasses import dataclass
 from tenacity import retry, stop_after_attempt, wait_exponential
 from google import genai
 from google.genai import types
+import tiktoken
+import re
+
+@dataclass
+class TokenCount:
+    """Token count information for a response."""
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
 
 class GeminiClient:
     """A client for interacting with Gemini API with region fallback capabilities."""
@@ -37,6 +48,13 @@ class GeminiClient:
             raise ValueError("Project ID must be provided or set in GCP_PROJECT environment variable")
             
         self.logger = logger or logging.getLogger(__name__)
+        
+        # Initialize tokenizer
+        try:
+            self.tokenizer = tiktoken.get_encoding("cl100k_base")  # GPT-4 encoding, close to Gemini
+        except Exception as e:
+            self.logger.warning(f"Failed to initialize tokenizer: {str(e)}")
+            self.tokenizer = None
         
         # List of regions to try
         self.regions = [
@@ -85,12 +103,89 @@ class GeminiClient:
             location=region
         )
 
+    def count_tokens(self, contents: List[types.Content]) -> TokenCount:
+        """
+        Count tokens in the input contents.
+        
+        Args:
+            contents: List of Content objects to count tokens for
+            
+        Returns:
+            TokenCount: Object containing token count information
+            
+        Raises:
+            Exception: If token counting fails
+        """
+        try:
+            if not self.tokenizer:
+                raise ValueError("Tokenizer not initialized. Install tiktoken package.")
+            
+            # Extract text from contents
+            total_text = ""
+            for content in contents:
+                for part in content.parts:
+                    if hasattr(part, 'text'):
+                        total_text += part.text + " "
+            
+            # Count tokens
+            token_count = len(self.tokenizer.encode(total_text))
+            
+            return TokenCount(
+                prompt_tokens=token_count,
+                completion_tokens=0,  # Will be updated after generation
+                total_tokens=token_count
+            )
+        except Exception as e:
+            self.logger.error(f"Token counting failed: {str(e)}")
+            raise
+
+    def _parse_response(self, response) -> Dict:
+        """Parse response into a structured dictionary."""
+        if hasattr(response, 'text'):
+            try:
+                # Clean up the text
+                text = response.text.strip()
+                
+                # Handle markdown code blocks
+                if '```json' in text:
+                    # Extract JSON from code block
+                    start = text.find('```json') + 7
+                    end = text.find('```', start)
+                    if end != -1:
+                        text = text[start:end].strip()
+                
+                # Try to parse as JSON
+                if text.startswith('{') and text.endswith('}'):
+                    return json.loads(text)
+                elif text.startswith('[') and text.endswith(']'):
+                    return json.loads(text)
+                
+                # If text contains embedded JSON object/array, try to extract it
+                json_pattern = r'\{[^{}]*\}|\[[^\[\]]*\]'
+                matches = re.finditer(json_pattern, text)
+                for match in matches:
+                    try:
+                        return json.loads(match.group())
+                    except json.JSONDecodeError:
+                        continue
+            except json.JSONDecodeError:
+                pass
+            except Exception as e:
+                self.logger.warning(f"JSON parsing failed: {str(e)}")
+            
+            # Return as regular text if not JSON
+            return {"text": response.text}
+        return {"text": str(response)}
+
     @retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3))
     def generate_content(self, 
                         contents: List[types.Content],
                         stream: bool = False,
                         generation_config: Optional[types.GenerateContentConfig] = None,
-                        model: str = "gemini-2.0-flash-exp") -> str:
+                        model: str = "gemini-2.0-flash-exp",
+                        return_json: bool = False,
+                        json_schema: Optional[Dict] = None,
+                        count_tokens: bool = False) -> Union[str, Dict, Tuple[Union[str, Dict], TokenCount]]:
         """
         Generate content using Gemini model with region fallback.
         
@@ -99,15 +194,29 @@ class GeminiClient:
             stream: Whether to stream the response
             generation_config: Optional custom generation config
             model: Model name to use
+            return_json: Whether to return response as JSON using SDK's JSON capability
+            json_schema: Optional JSON schema for structured responses
+            count_tokens: Whether to count tokens and return token usage
             
         Returns:
-            str: Generated content
+            Union[str, Dict]: Generated content as string or JSON if return_json=True
+            If count_tokens=True, returns a tuple of (content, TokenCount)
             
         Raises:
             Exception: If all regions fail
         """
         last_error = None
         gen_config = generation_config or self.default_generation_config
+        token_count = None
+        
+        if return_json:
+            if not json_schema:
+                json_schema = {"type": "OBJECT", "properties": {"response": {"type": "STRING"}}}
+            gen_config.response_mime_type = "application/json"
+            gen_config.response_schema = json_schema
+
+        if count_tokens:
+            token_count = self.count_tokens(contents)
 
         for region in self.regions:
             try:
@@ -119,14 +228,25 @@ class GeminiClient:
                         contents=contents,
                         config=gen_config
                     )
-                    return response
+                    if count_tokens:
+                        # Update token count with completion tokens
+                        token_count.completion_tokens = sum(len(chunk.text.split()) for chunk in response)
+                        token_count.total_tokens = token_count.prompt_tokens + token_count.completion_tokens
+                    return (response, token_count) if count_tokens else response
                 else:
                     response = client.models.generate_content(
                         model=model,
                         contents=contents,
                         config=gen_config
                     )
-                    return response.text
+                    
+                    if count_tokens:
+                        # Update token count with completion tokens
+                        token_count.completion_tokens = len(response.text.split())
+                        token_count.total_tokens = token_count.prompt_tokens + token_count.completion_tokens
+                    
+                    result = response.text
+                    return (result, token_count) if count_tokens else result
                     
             except Exception as e:
                 self.logger.warning(f"Error with region {region}: {str(e)}")
