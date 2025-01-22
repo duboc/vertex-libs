@@ -38,11 +38,7 @@ print(response)
 
 ## Installation
 
-```bash
-pip install vertex-libs
-```
-
-Or install from source:
+Install from source:
 
 ```bash
 git clone https://github.com/duboc/vertex-libs.git
@@ -69,23 +65,52 @@ For detailed usage instructions and examples, see [USAGE.md](USAGE.md).
 git clone https://github.com/duboc/vertex-libs.git
 cd vertex-libs
 
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
 # Install development dependencies
 pip install -e ".[dev]"
 ```
 
-### Running Tests
+### Testing
+
+We maintain a comprehensive test suite with 100% code coverage. The tests are written using pytest and include:
+
+- Unit tests for all functionality
+- Integration tests for API interactions
+- Mock tests for external dependencies
+- Error handling scenarios
+- Configuration validation
+
+To run the tests:
 
 ```bash
-# Run all tests
-pytest tests/
+# Quick test run
+pytest
+
+# Detailed test output
+pytest -v
 
 # Run with coverage report
-pytest tests/ --cov=vertex_libs --cov-report=term-missing
+pytest --cov=vertex_libs --cov-report=term-missing
+
+# Generate HTML coverage report
+pytest --cov=vertex_libs --cov-report=html
 ```
+
+For more detailed information about testing and contributing, see our [Contributing Guide](CONTRIBUTING.md).
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for:
+- Development environment setup
+- Coding standards
+- Test writing guidelines
+- Documentation requirements
+- Pull request process
+
+For major changes, please open an issue first to discuss what you would like to change.
 
 ## License
 
