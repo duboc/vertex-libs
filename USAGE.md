@@ -142,34 +142,32 @@ The `TokenCount` object provides:
 - `completion_tokens`: Number of tokens in the generated response
 - `total_tokens`: Total tokens used (prompt + completion)
 
-### 4. Dynamic Response Formats
+### 4. JSON Responses and Schema
 
-The client can return either text or JSON responses based on your needs:
+The client supports structured JSON responses using the Gemini SDK's built-in JSON capability. You can specify a schema to ensure the response follows a specific format.
 
-#### Text Response
+#### Basic JSON Response
 ```python
-# Get plain text response
-contents = [
-    types.Content(
-        role="user",
-        parts=[types.Part.from_text("What is quantum computing?")]
-    )
-]
+from vertex_libs import GeminiClient
+from google.genai import types
 
-response = client.generate_content(contents)
-print(f"Text response: {response}")
-```
+client = GeminiClient()
 
-#### JSON Response
-```python
-# Define schema for structured response
+# Define your JSON schema
 json_schema = {
     "type": "OBJECT",
     "properties": {
-        "definition": {"type": "STRING"},
-        "advantages": {"type": "ARRAY", "items": {"type": "STRING"}}
+        "response": {"type": "STRING"}  # Simple schema for text response
     }
 }
+
+# Create your prompt
+contents = [
+    types.Content(
+        role="user",
+        parts=[types.Part.from_text("Tell me a short story about a robot.")]
+    )
+]
 
 # Get JSON response
 response = client.generate_content(
@@ -180,15 +178,101 @@ response = client.generate_content(
 
 # Parse and use the response
 data = json.loads(response)
-print(f"Definition: {data['definition']}")
-for advantage in data['advantages']:
-    print(f"- {advantage}")
+print(data["response"])
 ```
 
-You can use the same client instance to switch between formats based on your needs. The response format is determined by:
-- `return_json=False` (default): Returns plain text
-- `return_json=True`: Returns JSON formatted according to schema
-- `json_schema`: Optional schema to structure JSON responses
+#### Structured JSON Response
+```python
+# Define a more complex schema
+json_schema = {
+    "type": "OBJECT",
+    "properties": {
+        "title": {"type": "STRING"},
+        "points": {"type": "ARRAY", "items": {"type": "STRING"}},
+        "summary": {"type": "STRING"},
+        "rating": {"type": "NUMBER"}
+    }
+}
+
+# Create a prompt that matches your schema
+contents = [
+    types.Content(
+        role="user",
+        parts=[types.Part.from_text("""
+            Analyze the book '1984' by George Orwell.
+            Include a title, key points, summary, and rating out of 10.
+        """)]
+    )
+]
+
+# Get structured JSON response
+response = client.generate_content(
+    contents,
+    return_json=True,
+    json_schema=json_schema
+)
+
+# Parse and use the structured data
+data = json.loads(response)
+print(f"Title: {data['title']}")
+print("\nKey Points:")
+for point in data['points']:
+    print(f"- {point}")
+print(f"\nSummary: {data['summary']}")
+print(f"Rating: {data['rating']}/10")
+```
+
+#### Schema Types and Format
+The schema supports various types and formats:
+```python
+json_schema = {
+    "type": "OBJECT",
+    "properties": {
+        # Basic types
+        "text_field": {"type": "STRING"},
+        "number_field": {"type": "NUMBER"},
+        "boolean_field": {"type": "BOOLEAN"},
+        
+        # Arrays
+        "string_array": {
+            "type": "ARRAY",
+            "items": {"type": "STRING"}
+        },
+        
+        # Nested objects
+        "nested_object": {
+            "type": "OBJECT",
+            "properties": {
+                "field1": {"type": "STRING"},
+                "field2": {"type": "NUMBER"}
+            }
+        }
+    }
+}
+```
+
+#### Response Mime Type
+When using JSON responses, the client automatically sets:
+- `response_mime_type = "application/json"`
+- `response_schema = your_schema` (or a default schema if none provided)
+
+#### Best Practices
+1. Always provide a schema that matches your prompt's expected output
+2. Handle JSON parsing errors gracefully
+3. Validate the response structure matches your expectations
+4. Keep schemas as simple as possible while meeting your needs
+
+```python
+try:
+    data = json.loads(response)
+    if all(key in data for key in ["title", "summary", "rating"]):
+        # Process the data
+        pass
+    else:
+        print("Response missing required fields")
+except json.JSONDecodeError:
+    print("Failed to parse JSON response")
+```
 
 ## Error Handling
 
