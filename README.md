@@ -13,6 +13,9 @@ A collection of robust Python libraries for Google Cloud Vertex AI, starting wit
 - 🎛️ **Custom Configurations**: Flexible generation parameters
 - 📊 **Logging Integration**: Custom logger support for better monitoring
 - ⚡ **Performance**: Optimized for production workloads
+- 🔄 **Async Support**: Non-blocking API calls for improved application responsiveness
+- 📦 **Batch Processing**: Efficiently process multiple prompts with controlled concurrency
+- 🔍 **Response Parsing Helpers**: Extract structured data from LLM responses (lists, JSON, key-value pairs)
 
 ## Quick Start
 
@@ -34,6 +37,45 @@ contents = [
 # Get response
 response = client.generate_content(contents)
 print(response)
+```
+
+### Advanced Features
+
+```python
+import asyncio
+from vertex_libs import GeminiClient
+from google.genai import types
+
+async def example():
+    client = GeminiClient()
+    
+    # Async API call
+    contents = [
+        types.Content(
+            role="user",
+            parts=[types.Part.from_text("What is quantum computing?")]
+        )
+    ]
+    response = await client.generate_content_async(contents)
+    
+    # Batch processing with a template
+    topics = ["Python", "JavaScript", "Rust"]
+    template = "What makes {item} unique compared to other programming languages?"
+    
+    results = client.map_generate(template=template, items=topics)
+    
+    # Response parsing
+    list_response = client.generate_content([
+        types.Content(
+            role="user",
+            parts=[types.Part.from_text("List 3 cloud providers.")]
+        )
+    ])
+    providers = client.extract_list(list_response)
+    print(f"Extracted providers: {providers}")
+
+# Run the async example
+asyncio.run(example())
 ```
 
 ## Installation
@@ -118,9 +160,9 @@ For major changes, please open an issue first to discuss what you would like to 
 
 ## Roadmap
 
-- [ ] Async support
-- [ ] Batch processing
-- [ ] Response parsing helpers
+- [x] Async support
+- [x] Batch processing
+- [x] Response parsing helpers
 - [ ] Token counting utilities
 - [ ] Rate limiting
 - [ ] Context management
