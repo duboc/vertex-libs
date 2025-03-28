@@ -294,16 +294,144 @@ logger = logging.getLogger("my_app")
 client = GeminiClient(logger=logger)
 ```
 
+## Advanced Features
+
+### 5. Asynchronous API Support
+
+The GeminiClient provides asynchronous methods for non-blocking API calls. This is particularly useful in web applications and other environments where you want to maintain responsiveness.
+
+```python
+import asyncio
+from vertex_libs import GeminiClient
+from google.genai import types
+
+async def example():
+    client = GeminiClient()
+    
+    contents = [
+        types.Content(
+            role="user",
+            parts=[types.Part.from_text("What is quantum computing?")]
+        )
+    ]
+    
+    # Async API call
+    response = await client.generate_content_async(contents)
+    return response
+
+# Run the async function
+result = asyncio.run(example())
+print(result)
+```
+
+For more details and advanced async examples, see the [Async Support Documentation](docs/features/async-support.md).
+
+### 6. Batch Processing
+
+The GeminiClient includes batch processing capabilities for efficiently handling multiple prompts:
+
+```python
+from vertex_libs import GeminiClient
+from google.genai import types
+
+client = GeminiClient()
+
+# Process multiple prompts at once
+prompts = ["What is Python?", "What is JavaScript?", "What is Rust?"]
+
+# Convert to contents format
+contents_list = [
+    [types.Content(
+        role="user",
+        parts=[types.Part.from_text(prompt)]
+    )]
+    for prompt in prompts
+]
+
+# Process in batch with concurrent requests (max 3 at a time)
+results = client.batch_generate_content(
+    contents_list=contents_list,
+    max_concurrency=3
+)
+
+# Template-based batch processing
+topics = ["Python", "JavaScript", "Rust"]
+template = "What makes {item} unique compared to other programming languages?"
+
+map_results = client.map_generate(
+    template=template,
+    items=topics,
+    max_concurrency=3
+)
+```
+
+For more details and advanced batch processing examples, see the [Batch Processing Documentation](docs/features/batch-processing.md).
+
+### 7. Response Parsing Helpers
+
+The GeminiClient provides helpers for extracting structured information from responses:
+
+```python
+from vertex_libs import GeminiClient
+from google.genai import types
+
+client = GeminiClient()
+
+# Extract lists from responses
+list_contents = [
+    types.Content(
+        role="user",
+        parts=[types.Part.from_text("List 5 programming best practices.")]
+    )
+]
+response = client.generate_content(list_contents)
+best_practices = client.extract_list(response)
+
+# Extract JSON data
+json_contents = [
+    types.Content(
+        role="user",
+        parts=[types.Part.from_text("Provide information about three programming languages in JSON format.")]
+    )
+]
+response = client.generate_content(json_contents)
+data = client.extract_json(response)
+
+# Extract key-value pairs
+kv_contents = [
+    types.Content(
+        role="user",
+        parts=[types.Part.from_text("""
+            Provide information about Python in this format:
+            Name: 
+            Creator: 
+            Year: 
+            Paradigm: 
+        """)]
+    )
+]
+response = client.generate_content(kv_contents)
+python_info = client.parse_key_value_pairs(response)
+
+# Extract text chunks
+chunk_contents = [
+    types.Content(
+        role="user",
+        parts=[types.Part.from_text("Write three paragraphs about AI. Separate with blank lines.")]
+    )
+]
+response = client.generate_content(chunk_contents)
+paragraphs = client.extract_text_chunks(response)
+```
+
+For more details and advanced parsing examples, see the [Response Parsing Documentation](docs/features/response-parsing.md).
+
 ## Improvement Suggestions
 
-1. **Async Support**: Consider adding async versions of the methods for better performance in async applications
-2. **Batch Processing**: Add support for batch processing multiple prompts
-3. **Response Parsing**: Add helper methods for common response parsing patterns
-4. **Model Selection**: Add model validation and available model listing
-5. **Token Counting**: Add methods to estimate token usage
-6. **Rate Limiting**: Implement rate limiting to prevent API quota issues
-7. **Context Management**: Implement context manager protocol for better resource management
-8. **Caching**: Add optional response caching for frequently used prompts
+1. **Model Selection**: Add model validation and available model listing
+2. **Rate Limiting**: Implement rate limiting to prevent API quota issues
+3. **Context Management**: Implement context manager protocol for better resource management
+4. **Caching**: Add optional response caching for frequently used prompts
 
 ## Environment Variables
 
