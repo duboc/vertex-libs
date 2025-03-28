@@ -23,7 +23,6 @@ The package will automatically install the following dependencies:
 - `google-cloud-aiplatform`: For Vertex AI integration
 - `google-generativeai`: For Gemini API
 - `tenacity`: For retry logic
-- `tiktoken`: For token counting
 
 ## Prerequisites
 
@@ -102,7 +101,7 @@ response = client.generate_content(
 
 ### 3. Token Counting and Usage Tracking
 
-The client provides token counting capabilities using OpenAI's `tiktoken` library, which provides a good approximation for Gemini's token usage. This can be used independently or combined with content generation.
+The client provides token counting capabilities using the native Google Generative AI SDK methods for accurate token counting. This can be used independently or combined with content generation.
 
 #### Independent Token Counting
 ```python
@@ -124,7 +123,7 @@ print(f"Prompt tokens: {token_count.prompt_tokens}")
 print(f"Total tokens: {token_count.total_tokens}")
 ```
 
-Note: Token counting is an approximation using the GPT-4 tokenizer, which is similar to Gemini's tokenization. The actual token count may vary slightly.
+Note: Token counting uses the native Gemini model tokenizer for precise token counts.
 
 #### Token Usage with Generation
 ```python

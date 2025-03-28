@@ -47,11 +47,27 @@ def main():
         )
         
         print("\nResponse:")
+        full_text = ""
         for chunk in stream:
-            print(chunk, end="")
+            # Extract just the text content from the chunk
+            try:
+                if hasattr(chunk, 'candidates') and chunk.candidates:
+                    # Get the first candidate
+                    candidate = chunk.candidates[0]
+                    if hasattr(candidate, 'content') and candidate.content.parts:
+                        # Get the text from the first part
+                        text = candidate.content.parts[0].text
+                        if text:
+                            full_text += text
+                            print(text, end="")
+            except Exception as e:
+                print(f"Error processing chunk: {e}")
+        
+        # Print a newline at the end
+        print()
 
     except Exception as e:
         print(f"Error occurred: {str(e)}")
 
 if __name__ == "__main__":
-    main() 
+    main()

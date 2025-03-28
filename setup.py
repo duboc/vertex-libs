@@ -23,8 +23,7 @@ setup(
     install_requires=[
         "google-cloud-aiplatform",
         "google-generativeai",
-        "tenacity",
-        "tiktoken"
+        "tenacity"
     ],
     extras_require={
         "dev": [
@@ -33,4 +32,4 @@ setup(
             "mock>=5.0.0"
         ]
     }
-) 
+)

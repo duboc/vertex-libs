@@ -65,13 +65,28 @@ def demonstrate_json_responses():
     response = client.generate_content(contents, return_json=True)
     
     # Process structured data
-    if isinstance(response, list):
-        for lang in response:
-            print(f"\nLanguage: {lang['name']}")
-            print(f"Created: {lang['year_created']}")
-            print(f"Use Case: {lang['main_use_case']}")
-            print(f"Rank: {lang['popularity_rank']}")
-    else:
+    try:
+        # Extract the list of languages if it's in a response wrapper or directly a list
+        if isinstance(response, dict) and any(isinstance(response.get(key), list) for key in response):
+            # Find the first list in the response
+            for key, value in response.items():
+                if isinstance(value, list):
+                    languages = value
+                    break
+        elif isinstance(response, list):
+            languages = response
+        else:
+            print("Response:", response)
+            return
+            
+        # Process each language entry
+        for lang in languages:
+            print(f"\nLanguage: {lang.get('name', 'Unknown')}")
+            print(f"Created: {lang.get('year_created', 'Unknown')}")
+            print(f"Use Case: {lang.get('main_use_case', 'Unknown')}")
+            print(f"Rank: {lang.get('popularity_rank', 'Unknown')}")
+    except Exception as e:
+        print(f"Error processing response: {e}")
         print("Response:", response)
 
 def demonstrate_combined_features():
@@ -114,26 +129,46 @@ def demonstrate_combined_features():
     
     print("\nStructured Response:")
     try:
-        data = json.loads(response)
-        if 'basic_definition' in data:
+        # Handle either dict or string response
+        if isinstance(response, dict):
+            data = response
+        else:
+            data = json.loads(response)
+            
+        # Use get() with default values for more robust handling
+        basic_definition = data.get('basic_definition')
+        if basic_definition:
             print(f"\nDefinition:")
-            print(data['basic_definition'])
+            print(basic_definition)
+        else:
+            print("\nDefinition: Not provided in response")
         
-        if 'key_concepts' in data:
-            print("\nKey Concepts:")
-            for concept in data['key_concepts']:
+        key_concepts = data.get('key_concepts', [])
+        print("\nKey Concepts:")
+        if key_concepts:
+            for concept in key_concepts:
                 print(f"- {concept}")
+        else:
+            print("- No key concepts provided in response")
         
-        if 'practical_applications' in data:
-            print("\nPractical Applications:")
-            for app in data['practical_applications']:
+        applications = data.get('practical_applications', [])
+        print("\nPractical Applications:")
+        if applications:
+            for app in applications:
                 print(f"- {app}")
+        else:
+            print("- No practical applications provided in response")
         
-        if 'current_limitations' in data:
-            print("\nCurrent Limitations:")
-            for limit in data['current_limitations']:
+        limitations = data.get('current_limitations', [])
+        print("\nCurrent Limitations:")
+        if limitations:
+            for limit in limitations:
                 print(f"- {limit}")
-    except json.JSONDecodeError:
+        else:
+            print("- No limitations provided in response")
+            
+    except (json.JSONDecodeError, TypeError, KeyError) as e:
+        print(f"Error processing response: {e}")
         print("Raw response:", response)
     
     print("\nToken Usage Statistics:")
@@ -185,13 +220,27 @@ def demonstrate_dynamic_response():
     )
     
     try:
-        data = json.loads(json_response)
+        # Handle either dict or string response
+        if isinstance(json_response, dict):
+            data = json_response
+        else:
+            data = json.loads(json_response)
+            
         print("\nStructured Data:")
-        print(f"Definition: {data['definition']}")
+        # Use get() with default values to handle potentially missing keys
+        definition = data.get('definition', 'No definition provided')
+        print(f"Definition: {definition}")
+        
         print("\nAdvantages:")
-        for advantage in data['advantages']:
-            print(f"- {advantage}")
-    except json.JSONDecodeError:
+        advantages = data.get('advantages', [])
+        if advantages:
+            for advantage in advantages:
+                print(f"- {advantage}")
+        else:
+            print("- No advantages provided in the response")
+            
+    except (json.JSONDecodeError, TypeError, KeyError) as e:
+        print(f"Error processing response: {e}")
         print("Raw response:", json_response)
 
 def main():
@@ -205,4 +254,4 @@ def main():
         print(f"Error occurred: {str(e)}")
 
 if __name__ == "__main__":
-    main() 
+    main()

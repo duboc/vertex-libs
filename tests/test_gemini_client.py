@@ -171,9 +171,10 @@ def test_custom_logger(caplog):
 
 def test_count_tokens(mock_genai, client):
     # Mock token counting response
-    mock_count = Mock()
-    mock_count.total_tokens = 10
-    mock_genai.Client().count_tokens.return_value = mock_count
+    mock_count_response = Mock()
+    mock_count_response.total_tokens = 10
+    # Set up the count_tokens mock on the client's models property
+    mock_genai.Client().models.count_tokens.return_value = mock_count_response
 
     contents = [
         types.Content(
@@ -187,6 +188,12 @@ def test_count_tokens(mock_genai, client):
     assert token_count.prompt_tokens == 10
     assert token_count.completion_tokens == 0
     assert token_count.total_tokens == 10
+    
+    # Verify the SDK method was called with correct parameters
+    mock_genai.Client().models.count_tokens.assert_called_once()
+    args, kwargs = mock_genai.Client().models.count_tokens.call_args
+    assert kwargs['model'] == client.default_model
+    assert kwargs['contents'] == contents
 
 def test_generate_content_with_token_count(mock_genai, client):
     # Mock response
@@ -195,9 +202,9 @@ def test_generate_content_with_token_count(mock_genai, client):
     mock_genai.Client().models.generate_content.return_value = mock_response
 
     # Mock token count
-    mock_count = Mock()
-    mock_count.total_tokens = 10
-    mock_genai.Client().count_tokens.return_value = mock_count
+    mock_count_response = Mock()
+    mock_count_response.total_tokens = 10
+    mock_genai.Client().models.count_tokens.return_value = mock_count_response
 
     contents = [
         types.Content(
@@ -212,6 +219,12 @@ def test_generate_content_with_token_count(mock_genai, client):
     assert token_count.prompt_tokens == 10
     assert token_count.completion_tokens == 5
     assert token_count.total_tokens == 15
+    
+    # Verify token counting was called with the correct model
+    mock_genai.Client().models.count_tokens.assert_called_once()
+    args, kwargs = mock_genai.Client().models.count_tokens.call_args
+    assert kwargs['model'] == client.default_model
+    assert kwargs['contents'] == contents
 
 def test_generate_content_json_response(mock_genai, client):
     # Mock JSON response
@@ -255,9 +268,9 @@ def test_generate_content_json_with_token_count(mock_genai, client):
     mock_genai.Client().models.generate_content.return_value = mock_response
 
     # Mock token count
-    mock_count = Mock()
-    mock_count.total_tokens = 5
-    mock_genai.Client().count_tokens.return_value = mock_count
+    mock_count_response = Mock()
+    mock_count_response.total_tokens = 5
+    mock_genai.Client().models.count_tokens.return_value = mock_count_response
 
     contents = [
         types.Content(
@@ -276,12 +289,12 @@ def test_generate_content_json_with_token_count(mock_genai, client):
     assert response["result"] == "success"
     assert isinstance(token_count, TokenCount)
     assert token_count.prompt_tokens == 5
-    assert token_count.completion_tokens == 1  # One JSON object
-    assert token_count.total_tokens == 6
+    assert token_count.completion_tokens == 2  # JSON object tokens as counted by the native method
+    assert token_count.total_tokens == 7  # Updated total to match new completion token count
 
 def test_count_tokens_error(mock_genai, client):
     # Mock token counting error
-    mock_genai.Client().count_tokens.side_effect = Exception("Token counting failed")
+    mock_genai.Client().models.count_tokens.side_effect = Exception("Token counting failed")
 
     contents = [
         types.Content(
@@ -292,4 +305,4 @@ def test_count_tokens_error(mock_genai, client):
 
     with pytest.raises(Exception) as exc_info:
         client.count_tokens(contents)
-    assert "Token counting failed" in str(exc_info.value) 
+    assert "Token counting failed" in str(exc_info.value)
