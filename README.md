@@ -164,7 +164,5 @@ For major changes, please open an issue first to discuss what you would like to 
 - [x] Batch processing
 - [x] Response parsing helpers
 - [x] Token counting utilities (using native SDK methods)
-- [ ] Rate limiting
 - [ ] Context management
 - [ ] Response caching
-- [ ] Additional Vertex AI integrations
